@@ -1,4 +1,4 @@
-# TP 5 – Activité 5-1 : Service de conversion de devise avec Java RMI
+# TP 5 – Activité 5-2 : Service de banque avec Java RMI et JNDI
 
 **Matière :** Développement d'Applications Réparties – LSI 3
 **Faculté des Sciences de Sfax** – Année universitaire 2026 – 2027
@@ -8,101 +8,106 @@
 
 ## 1. Objectif
 
-Concevoir une application répartie client/serveur avec **Java RMI (Remote Method Invocation)** qui offre un service de conversion d'un montant en **euros vers le dinar**.
+Développer une application répartie de gestion de comptes bancaires avec **Java RMI**, puis remplacer l'accès direct au registre RMI (`Naming`) par **JNDI** (Java Naming and Directory Interface) pour l'enregistrement (*bind*) et la recherche (*lookup*) de l'objet distant.
 
-Le cycle de vie du service distant couvre quatre phases :
-**Définition de l'interface → Implémentation → Enregistrement → Invocation.**
+Un compte bancaire est défini par : un **code** (`int`), un **solde** (`double`) et une **date de création** (`Date`).
+
+Services distants offerts par le serveur :
+- **Créer un compte** avec un code et un solde initial (si le code n'existe pas déjà) ;
+- **Consulter un compte** à partir de son code.
 
 
-## 2. Travail réalisé
 
-### Étape 1 – Préparation de l'espace de travail
-Création du répertoire `votreNomPrenom_LSI3_DevAppReparties` qui contient les deux projets (serveur et client).
+## . Travail réalisé
 
 ### Étape 2 – Développement du serveur
 
-**a) Interface distante `IConversion`** (package `rmiService`)
-Elle étend `java.rmi.Remote` et déclare la méthode distante `convertirMontant`, qui lève `RemoteException` (obligatoire pour toute méthode distante, car la communication réseau peut échouer).
-
-```java
-public interface IConversion extends Remote {
-    double convertirMontant(double mt) throws RemoteException;
-}
-```
-
-**b) Implémentation `ConversionImpl`** (package `rmiService`)
-La classe implémente `IConversion` et étend `UnicastRemoteObject`, ce qui permet d'exporter automatiquement l'objet pour qu'il soit accessible à distance. La méthode `convertirMontant` applique le taux de conversion euro → dinar au montant reçu (taux fixe défini dans le code).
-
-**c) Application serveur `ConversionServer`** (package `rmiServer`)
-Elle réalise trois opérations :
-1. activer l'annuaire **RMIRegistry** (`LocateRegistry.createRegistry(1099)`) ;
-2. créer une instance de `ConversionImpl` ;
-3. publier la référence de l'objet dans l'annuaire (`Naming.rebind(...)`) sous un nom connu des clients.
+- **`Compte`** (package `metier`) : classe qui implémente `Serializable`, avec les attributs `code`, `solde`, `dateCreation`. Elle doit être sérialisable car les objets `Compte` sont **transmis par copie** entre le client et le serveur à travers le réseau.
+- **`IBanque`** (package `rmiService`) : interface distante qui étend `Remote` et déclare :
+  - `String creerCompte(Compte c) throws RemoteException`
+  - `String getInfoCompte(int code) throws RemoteException`
+- **`BanqueImpl`** (package `rmiService`) : implémente `IBanque` (en étendant `UnicastRemoteObject`) et stocke les comptes dans une collection (clé = code). `creerCompte` refuse la création si le code existe déjà.
+- **`BanqueServer`** (package `rmiServer`) : démarre le registre RMI, crée l'objet `BanqueImpl` et le publie.
 
 ### Étape 3 – Développement du client
 
-1. **Export de l'interface :** depuis le projet serveur, on crée un artefact JAR (`ConversionClient.jar`) qui ne contient **que** `rmiService/IConversion.class`. L'implémentation `ConversionImpl` n'est volontairement pas incluse : le client n'a besoin que du *contrat* (l'interface), jamais du code du serveur.
-2. **Import du JAR :** `ConversionClient.jar` est ajouté au classpath du projet client (dossier `lib` + dépendance du module).
-3. **Application `ConversionClient`** (package `rmiClient`) :
-   - recherche la référence distante dans le RMIRegistry (`Naming.lookup(...)`) ;
-   - la convertit vers le type `IConversion` ;
-   - invoque `convertirMontant(500)` et affiche le résultat.
+- Export du JAR **`banqueClient.jar`** depuis le serveur, contenant **uniquement** `metier/Compte.class` et `rmiService/IBanque.class` (sans `BanqueImpl`).
+- Ajout du JAR au classpath de `RMIBanque_Client`.
+- Création de `BanqueClient` (package `rmiClient`) qui recherche l'objet distant `IBanque`, crée un compte puis consulte ses informations.
 
-### Étape 4 – Exécution
-Le serveur est lancé en premier, puis le client.
+### Étape 5 – Passage à JNDI
+
+Le fichier **`jndi.properties`** (dans `src`) configure le contexte JNDI pour qu'il utilise le registre RMI :
+
+```properties
+java.naming.factory.initial=com.sun.jndi.rmi.registry.RegistryContextFactory
+java.naming.provider.url=rmi://localhost:1099
+```
+
+- **Serveur :** un `InitialContext` remplace `Naming` ; l'objet `BanqueImpl` est enregistré avec `context.rebind(...)`.
+- **Client :** l'objet distant est recherché avec `context.lookup(...)` via un `InitialContext`, au lieu de `Naming.lookup(...)`.
 
 ---
 
 ## 3. Captures d'écran et explications
 
-### 3.1 Structure du projet serveur
-<img width="346" height="673" alt="03_structure_serveur" src="https://github.com/user-attachments/assets/2ff1fae5-f2cb-43ed-bb59-a84af34eb4a7" />
+### 3.1 Étape 4 – Exécution avec le registre RMI
 
+**Démarrage du serveur**
 
-Le projet serveur contient le package `rmiService` (interface `IConversion` et classe `ConversionImpl`) et le package `rmiServer` (classe `ConversionServer`). Le dossier `out/artifacts/ConversionClient` contient le fichier `ConversionClient.jar` généré pour le client.
+![Serveur démarré](images/01_serveur_demarre.png)
 
-### 3.2 Création du JAR (Artifacts)
-<img width="1030" height="472" alt="06_artifact_jar" src="https://github.com/user-attachments/assets/cfc2b5ff-21e6-413b-98cc-a01b7d9cb9fa" />
+Le serveur affiche « Serveur Banque RMI démarré... » : le registre est actif et l'objet `BanqueImpl` est publié.
 
+**Exécution du client**
 
-Dans *Project Structure → Artifacts*, un artefact de type **JAR** nommé `ConversionClient` a été créé. Dans son *Output Layout*, seule la classe `rmiService/IConversion.class` est incluse, conformément à la consigne (sans `ConversionImpl`).
+![Résultat du client](images/02_client_resultat.png)
 
-### 3.3 Structure du projet client
-<img width="360" height="660" alt="04_structure_client" src="https://github.com/user-attachments/assets/016995d5-926e-48a6-b01b-0e16f0eb5fc0" />
+Le client affiche « Compte créé avec succès. » puis les informations du compte consulté : `Compte{code=1, solde=5000.0, dateCreation=...}`. Les deux méthodes distantes (`creerCompte` et `getInfoCompte`) fonctionnent.
 
+### 3.2 Étape 3 – Génération et import du JAR client
 
-Le projet client contient le dossier `lib` avec `ConversionClient.jar` (qui expose `rmiService.IConversion`) et le package `rmiClient` avec la classe `ConversionClient`. Le JAR apparaît aussi dans *External Libraries*.
+**Artefact JAR `banqueClient`**
 
-### 3.4 Ajout du JAR aux dépendances du client
-<img width="1004" height="437" alt="05_dependance_client" src="https://github.com/user-attachments/assets/d28c1530-8cb0-4d7b-bb21-8c0adae2be41" />
+![Artefact JAR](images/03_artifact_jar.png)
 
+Dans *Project Structure → Artifacts*, l'artefact `banqueClient` (type JAR) contient uniquement `metier/Compte.class` et `rmiService/IBanque.class`, conformément à la consigne (sans `BanqueImpl`).
 
-Dans *Project Structure → Modules → Dependencies*, `ConversionClient.jar` est ajouté avec la portée **Compile**. Le client peut ainsi utiliser l'interface `IConversion` sans disposer du code du serveur.
+**Dépendance dans le projet client**
 
-### 3.5 Démarrage du serveur RMI
-<img width="742" height="171" alt="01_serveur_demarre" src="https://github.com/user-attachments/assets/df17dd6e-32ef-46f4-a591-491e1444d4fc" />
+![Dépendance du client](images/04_dependance_client.png)
 
+`banqueClient.jar` est ajouté dans *Modules → Dependencies* du projet `RMIBanque_Client` avec la portée **Compile**.
 
-La console affiche le message **« Serveur RMI de conversion démarré... »** : le registre RMI est actif et l'objet `ConversionImpl` est publié (la ligne `ConversionImpl[UnicastServerRef [liveRef: [endpoint:[192.168.1.13:57076]...` montre l'objet distant exporté, avec l'adresse IP et le port sur lesquels il écoute).
+### 3.3 Étape 5 – Exécution avec JNDI
 
-### 3.6 Exécution du client
-<img width="434" height="223" alt="02_resultat_client" src="https://github.com/user-attachments/assets/ef02e64f-2b28-4600-938d-066266d1098c" />
+**Démarrage du serveur avec JNDI**
 
+![Serveur JNDI](images/05_serveur_jndi.png)
 
-Le client affiche **« Résultat de la conversion : 600.0 »** pour l'appel `convertirMontant(500)` et se termine avec le code `0` (exécution sans erreur). Cela confirme que l'appel de méthode a bien été exécuté sur l'objet distant, côté serveur (500 × 1,2 = 600).
+Le message « Serveur Banque RMI avec JNDI démarré... » confirme que l'objet distant est désormais enregistré via `InitialContext`.
+
+**Client JNDI – création du compte**
+
+![Client JNDI création](images/06_client_jndi_creation.png)
+
+Le client retrouve l'objet distant par `lookup` JNDI, crée le compte (« Compte créé avec succès. ») et affiche ses informations. La communication RMI fonctionne donc toujours avec JNDI.
+
+**Client JNDI – compte déjà existant**
+
+![Client JNDI compte existant](images/07_client_jndi_existe_deja.png)
+
+En relançant le client sans redémarrer le serveur, le message « Ce compte existe déjà. » s'affiche : le serveur a conservé le compte en mémoire et refuse de créer un doublon avec le même code. On remarque que la **date de création est identique** à celle de la première exécution (le compte n'a pas été recréé).
 
 ---
 
 ## 4. Synthèse
 
-Cette activité m'a permis de mettre en œuvre une communication client/serveur avec **Java RMI** :
+- **RMI** permet au client d'invoquer des méthodes sur un objet situé sur le serveur comme s'il était local, grâce au **stub**.
+- La classe **`Compte`** est **sérialisable** : elle est passée *par valeur* (copie) entre client et serveur, alors que `IBanque` est un objet **distant** passé *par référence* (stub).
+- Le **JAR client** ne contient que le contrat (`IBanque`) et le modèle (`Compte`) : le client ne dépend pas de l'implémentation du serveur.
+- **JNDI** fournit une API standard d'annuaire (`InitialContext`, `bind/rebind`, `lookup`). Le fichier **`jndi.properties`** indique la fabrique de contexte (`RegistryContextFactory`) et l'URL du registre RMI, ce qui découple le code du fournisseur d'annuaire utilisé.
+- **Règle métier :** un compte n'est créé que si son code n'existe pas déjà, ce qui est vérifié par le test du second lancement du client.
+- **Ordre d'exécution :** toujours démarrer le serveur avant le client.
 
-- **Interface distante** (`IConversion`) : le contrat partagé entre client et serveur ; elle étend `Remote` et ses méthodes lèvent `RemoteException`.
-- **Implémentation** (`ConversionImpl`) : elle reste côté serveur ; l'objet est exporté via `UnicastRemoteObject`.
-- **Enregistrement** : le serveur crée le **RMIRegistry** et y publie la référence de l'objet sous un nom (`rebind`).
-- **Invocation** : le client fait un `lookup` dans l'annuaire, obtient un **stub** (proxy) et appelle la méthode comme s'il s'agissait d'un objet local ; RMI gère la sérialisation et la communication réseau.
-- **Séparation client/serveur** : grâce au JAR contenant uniquement l'interface, le client ne dépend pas de l'implémentation.
-
-**Ordre d'exécution :** toujours démarrer le serveur (création du registre) avant le client, sinon le `lookup` échoue (`ConnectException`).
-
-**Résultat :** l'application fonctionne correctement ; la conversion de 500 € renvoie 600.0 (taux fixe utilisé dans l'implémentation).
+**Résultat :** l'application fonctionne correctement avec le registre RMI puis avec JNDI.

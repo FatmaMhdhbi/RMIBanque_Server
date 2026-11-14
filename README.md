@@ -16,27 +16,8 @@ Services distants offerts par le serveur :
 - **Créer un compte** avec un code et un solde initial (si le code n'existe pas déjà) ;
 - **Consulter un compte** à partir de son code.
 
-## 2. Architecture du projet
 
-```
-votreNomPrenom_LSI3_DevAppReparties/
-├── RMIBanque_Server/
-│   ├── src/
-│   │   ├── jndi.properties
-│   │   ├── metier/Compte.java            (classe sérialisable)
-│   │   ├── rmiService/IBanque.java       (interface distante)
-│   │   ├── rmiService/BanqueImpl.java    (implémentation)
-│   │   └── rmiServer/BanqueServer.java   (serveur)
-│   └── out/artifacts/banqueClient/banqueClient.jar
-├── RMIBanque_Client/
-│   ├── lib/banqueClient.jar
-│   └── src/
-│       ├── jndi.properties
-│       └── rmiClient/BanqueClient.java
-└── README.md
-```
-
-## 3. Travail réalisé
+## 2. Travail réalisé
 
 ### Étape 2 – Développement du serveur
 
@@ -67,9 +48,9 @@ java.naming.provider.url=rmi://localhost:1099
 
 ---
 
-## 4. Captures d'écran et explications
+## 3. Captures d'écran et explications
 
-### 4.1 Étape 4 – Exécution avec le registre RMI
+### 3.1 Étape 4 – Exécution avec le registre RMI
 
 **Démarrage du serveur**
 
@@ -85,7 +66,7 @@ Le serveur affiche « Serveur Banque RMI démarré... » : le registre est actif
 
 Le client affiche « Compte créé avec succès. » puis les informations du compte consulté : `Compte{code=1, solde=5000.0, dateCreation=...}`. Les deux méthodes distantes (`creerCompte` et `getInfoCompte`) fonctionnent.
 
-### 4.2 Étape 3 – Génération et import du JAR client
+### 3.2 Étape 3 – Génération et import du JAR client
 
 **Artefact JAR `banqueClient`**
 
@@ -102,7 +83,7 @@ Dans *Project Structure → Artifacts*, l'artefact `banqueClient` (type JAR) con
 
 `banqueClient.jar` est ajouté dans *Modules → Dependencies* du projet `RMIBanque_Client` avec la portée **Compile**.
 
-### 4.3 Étape 5 – Exécution avec JNDI
+### 3.3 Étape 5 – Exécution avec JNDI
 
 **Démarrage du serveur avec JNDI**
 
@@ -127,7 +108,7 @@ En relançant le client sans redémarrer le serveur, le message « Ce compte exi
 
 ---
 
-## 5. Synthèse
+## 4. Synthèse
 
 - **RMI** permet au client d'invoquer des méthodes sur un objet situé sur le serveur comme s'il était local, grâce au **stub**.
 - La classe **`Compte`** est **sérialisable** : elle est passée *par valeur* (copie) entre client et serveur, alors que `IBanque` est un objet **distant** passé *par référence* (stub).
